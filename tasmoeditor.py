@@ -11,6 +11,7 @@ import json
 import mqtt
 from datetime import datetime
 import scrape_docs, collections
+import pickle
 
 import threading
 import configparser
@@ -20,6 +21,7 @@ from PyQt6.QtWidgets import QApplication, QMessageBox, QTextBrowser, QLabel, QVB
     QPushButton, QTableWidgetItem
 
 config_name = 'tasmoeditor.cfg'                # contains config data
+tasmota_cmd_file = 'tasmota_cmds.pkl'
 
 class UI(QtWidgets.QMainWindow, editorUI.Ui_MainWindow):
 
@@ -42,19 +44,24 @@ class UI(QtWidgets.QMainWindow, editorUI.Ui_MainWindow):
         mqtt.init_mqtt(self)
         self.CmdtableWidget.setColumnCount(2)
         self.CmdtableWidget.setHorizontalHeaderLabels(self.header_labels)
-        #self.client.on_connect = mqtt.on_connect
-        #self.client.on_message = mqtt.on_message
+        self.actionClear_tasmota_commands.triggered.connect(self.del_tasmota_cmds_file)
         self.btn_connect_mqtt.clicked.connect(mqtt.connect_mqtt)
         self.btn_disconnect.clicked.connect(mqtt.disconnect_mqtt)
         self.btn_clear_log.clicked.connect(self.clear_log)
         self.btn_show_cmd_docs.clicked.connect(self.show_cmnd_docs)
         self.btn_link_device.clicked.connect(self.link_tasmota_device)
         self.CmdtableWidget.horizontalHeader()
-        try:
-            self.init_scraper(self.docs_url)
-        except Exception as e:
-            self.append_to_log('Could not get commands list from:'+self.docs_url)
-            print(e)
+        if os.path.isfile(tasmota_cmd_file):                                         # load tasmota cmd file if exists
+            with open(tasmota_cmd_file, 'rb') as f:
+                data = pickle.load(f)                                               # load data with pickle
+                self.docs_url = tasmota_cmd_file                                     # change url because it was loaded from file
+                self.doc_thread_result(data)                                        # save data from file to var and display cmds in ui
+        else:                                                                       # fetch cmds from url
+            try:
+                self.init_scraper(self.docs_url)
+            except Exception as e:
+                self.append_to_log('Could not get commands list from:'+self.docs_url)
+                print(e)
 
     def append_to_log(self, text):
         self.txt_log.append(datetime.today().strftime('%d-%m-%Y %H:%M:%S') + '\t' + str(text))  # '\t' = tab space
@@ -84,6 +91,9 @@ class UI(QtWidgets.QMainWindow, editorUI.Ui_MainWindow):
 
     def doc_thread_result(self,data):
         self.cmds_in_docs = collections.OrderedDict(sorted(data.items()))
+        if not os.path.isfile(tasmota_cmd_file):
+            with open(tasmota_cmd_file, 'wb') as f:
+                pickle.dump(self.cmds_in_docs, f)
         self.append_to_log('Docs fetched from: '+self.docs_url)
         self.btn_show_cmd_docs.setEnabled(True)
         self.cmd_list_widget.clear()
@@ -201,6 +211,14 @@ class UI(QtWidgets.QMainWindow, editorUI.Ui_MainWindow):
         self.cmb_devices.setEnabled(False)
         self.btn_link_device.setText('Disconnect from ...')
         self.device_connected = True
+
+    def del_tasmota_cmds_file(self):
+        try:
+            os.remove(tasmota_cmd_file)
+            QMessageBox.warning(self, 'Success!','Command file '+tasmota_cmd_file+' deleted. Please restart program.')
+        except OSError:
+            QMessageBox.information(self, 'Nothing to do!', 'No '+tasmota_cmd_file+' file found.')
+            pass
 
 
 class scrape_page(QObject):

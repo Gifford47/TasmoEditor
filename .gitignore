@@ -120,6 +120,7 @@ img/
 Desktop.ini
 *.xlsx
 *.svg
+*.pkl
 
 # Sensitive or high-churn files:
 .idea/dataSources.ids
