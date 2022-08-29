@@ -16,8 +16,8 @@ import pickle
 import threading
 import configparser
 from PyQt6 import QtGui, QtWidgets
-from PyQt6.QtCore import QObject, QThread, pyqtSignal
-from PyQt6.QtWidgets import QApplication, QMessageBox, QTextBrowser, QLabel, QVBoxLayout, QWidget, \
+from PyQt6.QtCore import QObject, QThread, pyqtSignal, Qt
+from PyQt6.QtWidgets import QApplication, QMessageBox, QTextBrowser, QTableWidget, QVBoxLayout, QWidget, \
     QPushButton, QTableWidgetItem
 
 config_name = 'tasmoeditor.cfg'                # contains config data
@@ -44,6 +44,8 @@ class UI(QtWidgets.QMainWindow, editorUI.Ui_MainWindow):
         mqtt.init_mqtt(self)
         self.CmdtableWidget.setColumnCount(2)
         self.CmdtableWidget.setHorizontalHeaderLabels(self.header_labels)
+        self.CmdtableWidget.keyPressEvent = self.tableOnKeyPressEvent               # on keyReleaseEvent
+
         self.actionClear_tasmota_commands.triggered.connect(self.del_tasmota_cmds_file)
         self.btn_connect_mqtt.clicked.connect(mqtt.connect_mqtt)
         self.btn_disconnect.clicked.connect(mqtt.disconnect_mqtt)
@@ -129,11 +131,15 @@ class UI(QtWidgets.QMainWindow, editorUI.Ui_MainWindow):
         if '<x>' or '<X>' in cmd:
             cmd = cmd.replace('<x>','')
         try:
-            mqtt.client.publish(self.current_cmd_topic + cmd, "")
-            self.append_to_log("TX:" + self.current_cmd_topic + cmd)
+            self.mqtt_send(cmd, "")
         except Exception as e:
             self.append_to_log(str(e))
             print(e)
+
+    def mqtt_send(self, command, payload):
+        mqtt.client.publish(self.current_cmd_topic + command, payload)
+        self.append_to_log("TX:" + self.current_cmd_topic + command + ' ' + payload)
+        print("MQTT TX:" + self.current_cmd_topic + command + ' ' + payload)
 
     def draw_data_table(self, payload):
         para_no = 1
@@ -219,6 +225,16 @@ class UI(QtWidgets.QMainWindow, editorUI.Ui_MainWindow):
         except OSError:
             QMessageBox.information(self, 'Nothing to do!', 'No '+tasmota_cmd_file+' file found.')
             pass
+
+    def tableOnKeyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Return or event.key() == Qt.Key.Key_Enter:
+            for a in self.CmdtableWidget.selectedItems():
+                #print(a.row(),a.column(),a.text())             # get row, get col, get text of selected item
+                #print(self.CmdtableWidget.cellWidget(a.row(),0).objectName(), a.text())     # get cellwidget at row and col, get its name, get text of sel. item
+                cmd = self.CmdtableWidget.cellWidget(a.row(),0).objectName()
+                payload = a.text()
+                self.mqtt_send(cmd, payload)
+            QTableWidget.keyPressEvent(self.CmdtableWidget, event)      # pass on the keyPressEvent to the table
 
 
 class scrape_page(QObject):

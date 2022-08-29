@@ -11,7 +11,11 @@ def get_all_commands(url):
     cmd_list = {}
 
     for table in tables:
-        lines = table.find_all('tr')                 # BeautifulSoup find 'tr'
+        lines = table.find_all('tr')                 # BeautifulSoup find 'tr' (defines a row in an HTML table)
+        title_of_table = table.find_all('th')           # find all table heads in current table
+        #print(title_of_table)
+        if 'command' not in title_of_table[0].get_text().lower():       # if text of tablehead (1st col.) is NOT 'Command', then continue to next table found in the docs
+            continue
         for line in lines:
             tds = line.find_all('td')              # BeautifulSoup find 'td' (zelle)
             try:

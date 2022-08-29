@@ -28,7 +28,7 @@ def on_message(client, userdata, msg):
             return
         #print(ui.tasmota_devices)
         return
-    ui.append_to_log("topic:'" + msg.topic + "' msg:" + msg.payload)
+    ui.append_to_log("RX:topic:'" + msg.topic + "' msg:" + msg.payload)
     payload = json.loads(msg.payload)
     ui.draw_data_table(payload)
 
