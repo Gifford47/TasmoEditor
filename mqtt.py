@@ -35,6 +35,8 @@ def on_message(client, userdata, msg):
 def connect_mqtt():
     init_mqtt(ui)
     try:
+        if ui.txt_user.text() != '' and ui.txt_pass.text() != '':
+            client.username_pw_set(username=ui.txt_user.text(), password=ui.txt_pass.text())
         client.connect(ui.txt_ip.text(), int(ui.mqtt_port.text()), 60)
         ui.btn_connect_mqtt.setDisabled(True)
         ui.btn_link_device.setDisabled(False)
