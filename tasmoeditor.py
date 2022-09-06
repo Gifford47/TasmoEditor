@@ -45,6 +45,7 @@ class UI(QtWidgets.QMainWindow, editorUI.Ui_MainWindow):
         self.CmdtableWidget.setColumnCount(2)
         self.CmdtableWidget.setHorizontalHeaderLabels(self.header_labels)
         self.CmdtableWidget.keyPressEvent = self.tableOnKeyPressEvent               # on keyReleaseEvent
+        self.CmdtableWidget.itemChanged.connect(self.table_value_changed)
 
         self.actionClear_tasmota_commands.triggered.connect(self.del_tasmota_cmds_file)
         self.btn_connect_mqtt.clicked.connect(mqtt.connect_mqtt)
@@ -227,15 +228,22 @@ class UI(QtWidgets.QMainWindow, editorUI.Ui_MainWindow):
             pass
 
     def tableOnKeyPressEvent(self, event):
+        if len(self.CmdtableWidget.selectedItems()) == 1:
+            QTableWidget.keyPressEvent(self.CmdtableWidget, event)      # pass on the keyPressEvent to the table
+            return
         if event.key() == Qt.Key.Key_Return or event.key() == Qt.Key.Key_Enter:
             for a in self.CmdtableWidget.selectedItems():
                 #print(a.row(),a.column(),a.text())             # get row, get col, get text of selected item
                 #print(self.CmdtableWidget.cellWidget(a.row(),0).objectName(), a.text())     # get cellwidget at row and col, get its name, get text of sel. item
-                cmd = self.CmdtableWidget.cellWidget(a.row(),0).objectName()
+                cmd = self.CmdtableWidget.cellWidget(a.row(),0).objectName()            # get the objname of the cmd in the row
                 payload = a.text()
                 self.mqtt_send(cmd, payload)
             QTableWidget.keyPressEvent(self.CmdtableWidget, event)      # pass on the keyPressEvent to the table
 
+    def table_value_changed(self, item):
+        cmd = self.CmdtableWidget.cellWidget(item.row(), 0).objectName()            # get the objname of the cmd in the row
+        payload = item.text()
+        self.mqtt_send(cmd, payload)
 
 class scrape_page(QObject):
     finished = pyqtSignal()
