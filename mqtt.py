@@ -29,8 +29,11 @@ def on_message(client, userdata, msg):
         #print(ui.tasmota_devices)
         return
     ui.append_to_log("RX:topic:'" + msg.topic + "' msg:" + msg.payload)
-    payload = json.loads(msg.payload)
-    ui.draw_data_table(payload)
+    try:
+        payload = json.loads(msg.payload)
+        ui.draw_data_table(payload)
+    except Exception as e:
+        pass
 
 def connect_mqtt():
     init_mqtt(ui)

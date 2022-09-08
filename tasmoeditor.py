@@ -164,7 +164,10 @@ class UI(QtWidgets.QMainWindow, editorUI.Ui_MainWindow):
                         header = header + [self.col_prefix + str(para_no)]  # define header labels
                         self.CmdtableWidget.setHorizontalHeaderLabels(header)  # set new header labels
                     self.header_labels = header  # save header labels in class
-                    payload = dict_res[key].replace("'",'')         # remove quotes from json
+                    try:
+                        payload = dict_res[key].replace("'",'')         # remove quotes from json
+                    except Exception as e:
+                        payload = json.dumps(dict_res[key])
                     self.CmdtableWidget.setItem(btn_index, para_no, QTableWidgetItem(payload))  # fill cell with data @ row, col
             self.header_labels = ['Command', self.col_prefix + '1']
 
@@ -206,19 +209,22 @@ class UI(QtWidgets.QMainWindow, editorUI.Ui_MainWindow):
         self.current_state_topic = "stat/" + topic + "/RESULT"
         if self.device_connected:
             mqtt.client.unsubscribe(self.current_state_topic)
+            mqtt.client.unsubscribe("stat/" + topic + "/#")  # also unsubscribe other topic
             self.response_dict = {}          # clear dict/ all responses
-            self.append_to_log('Unsubscribe topic:' + self.current_state_topic)
+            self.append_to_log('Unsubscribe topics, i.e.:' + self.current_state_topic)
             self.cmb_devices.setEnabled(True)
             self.device_connected = False
             self.btn_link_device.setText('Connect to ...')
             self.current_cmd_topic = ""
             self.current_state_topic = ""
             return
-        self.append_to_log('Subscribe topic:' + self.current_state_topic)
+        self.append_to_log('Subscribe topics, i.e.:' + self.current_state_topic)
         mqtt.client.subscribe(self.current_state_topic)
+        mqtt.client.subscribe("stat/" + topic + "/#")         # also subscribe all other topics
         self.cmb_devices.setEnabled(False)
         self.btn_link_device.setText('Disconnect from ...')
         self.device_connected = True
+        self.mqtt_send('status', '2')
 
     def del_tasmota_cmds_file(self):
         try:
