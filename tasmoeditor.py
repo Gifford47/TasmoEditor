@@ -142,17 +142,17 @@ class UI(QtWidgets.QMainWindow, editorUI.Ui_MainWindow):
         self.append_to_log("TX:" + self.current_cmd_topic + command + ' ' + payload)
         print("MQTT TX:" + self.current_cmd_topic + command + ' ' + payload)
 
-    def draw_data_table(self, payload):
+    def draw_data_table(self, dict_res):
         para_no = 1
         header = self.header_labels
-        for key in payload:
+        for key in dict_res:
             try:
                 para_no = int(re.findall(r'\d+', key)[-1])  # search for parameter, i.e. POWER1 -> 1
                 cmd = key.replace(str(para_no), "")  # remove parameter from key
             except Exception as e:
                 cmd = key
             self.response_dict.setdefault(cmd, {})
-            self.response_dict[cmd][key] = payload[key]
+            self.response_dict[cmd][key] = dict_res[key]
             btn_widgets = self.CmdtableWidget.findChildren(QPushButton)  # returns a list of all QLineEdit objects
             for widget in btn_widgets:  # loop through all found QLineEdit widgets
                 if str(cmd).lower() == str(widget.objectName()).lower():  # and look if the widget name is in 'json_dev_status' dict
@@ -164,7 +164,8 @@ class UI(QtWidgets.QMainWindow, editorUI.Ui_MainWindow):
                         header = header + [self.col_prefix + str(para_no)]  # define header labels
                         self.CmdtableWidget.setHorizontalHeaderLabels(header)  # set new header labels
                     self.header_labels = header  # save header labels in class
-                    self.CmdtableWidget.setItem(btn_index, para_no, QTableWidgetItem(json.dumps(payload[key])))  # fill cell with data @ row, col
+                    payload = dict_res[key].replace("'",'')         # remove quotes from json
+                    self.CmdtableWidget.setItem(btn_index, para_no, QTableWidgetItem(payload))  # fill cell with data @ row, col
             self.header_labels = ['Command', self.col_prefix + '1']
 
     def show_cmnd_docs(self):
