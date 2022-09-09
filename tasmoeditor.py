@@ -142,17 +142,17 @@ class UI(QtWidgets.QMainWindow, editorUI.Ui_MainWindow):
         self.append_to_log("TX:" + self.current_cmd_topic + command + ' ' + payload)
         print("MQTT TX:" + self.current_cmd_topic + command + ' ' + payload)
 
-    def draw_data_table(self, payload):
+    def draw_data_table(self, dict_res):
         para_no = 1
         header = self.header_labels
-        for key in payload:
+        for key in dict_res:
             try:
                 para_no = int(re.findall(r'\d+', key)[-1])  # search for parameter, i.e. POWER1 -> 1
                 cmd = key.replace(str(para_no), "")  # remove parameter from key
             except Exception as e:
                 cmd = key
             self.response_dict.setdefault(cmd, {})
-            self.response_dict[cmd][key] = payload[key]
+            self.response_dict[cmd][key] = dict_res[key]
             btn_widgets = self.CmdtableWidget.findChildren(QPushButton)  # returns a list of all QLineEdit objects
             for widget in btn_widgets:  # loop through all found QLineEdit widgets
                 if str(cmd).lower() == str(widget.objectName()).lower():  # and look if the widget name is in 'json_dev_status' dict
@@ -164,7 +164,11 @@ class UI(QtWidgets.QMainWindow, editorUI.Ui_MainWindow):
                         header = header + [self.col_prefix + str(para_no)]  # define header labels
                         self.CmdtableWidget.setHorizontalHeaderLabels(header)  # set new header labels
                     self.header_labels = header  # save header labels in class
-                    self.CmdtableWidget.setItem(btn_index, para_no, QTableWidgetItem(json.dumps(payload[key])))  # fill cell with data @ row, col
+                    try:
+                        payload = dict_res[key].replace("'",'')         # remove quotes from json
+                    except Exception as e:
+                        payload = json.dumps(dict_res[key])
+                    self.CmdtableWidget.setItem(btn_index, para_no, QTableWidgetItem(payload))  # fill cell with data @ row, col
             self.header_labels = ['Command', self.col_prefix + '1']
 
     def show_cmnd_docs(self):
@@ -205,19 +209,22 @@ class UI(QtWidgets.QMainWindow, editorUI.Ui_MainWindow):
         self.current_state_topic = "stat/" + topic + "/RESULT"
         if self.device_connected:
             mqtt.client.unsubscribe(self.current_state_topic)
+            mqtt.client.unsubscribe("stat/" + topic + "/#")  # also unsubscribe other topic
             self.response_dict = {}          # clear dict/ all responses
-            self.append_to_log('Unsubscribe topic:' + self.current_state_topic)
+            self.append_to_log('Unsubscribe topics, i.e.:' + self.current_state_topic)
             self.cmb_devices.setEnabled(True)
             self.device_connected = False
             self.btn_link_device.setText('Connect to ...')
             self.current_cmd_topic = ""
             self.current_state_topic = ""
             return
-        self.append_to_log('Subscribe topic:' + self.current_state_topic)
+        self.append_to_log('Subscribe topics, i.e.:' + self.current_state_topic)
         mqtt.client.subscribe(self.current_state_topic)
+        mqtt.client.subscribe("stat/" + topic + "/#")         # also subscribe all other topics
         self.cmb_devices.setEnabled(False)
         self.btn_link_device.setText('Disconnect from ...')
         self.device_connected = True
+        self.mqtt_send('status', '2')
 
     def del_tasmota_cmds_file(self):
         try:
@@ -228,19 +235,24 @@ class UI(QtWidgets.QMainWindow, editorUI.Ui_MainWindow):
             pass
 
     def tableOnKeyPressEvent(self, event):
-        if event.key() == Qt.Key.Key_Return or event.key() == Qt.Key.Key_Enter:
-            for a in self.CmdtableWidget.selectedItems():
-                #print(a.row(),a.column(),a.text())             # get row, get col, get text of selected item
-                #print(self.CmdtableWidget.cellWidget(a.row(),0).objectName(), a.text())     # get cellwidget at row and col, get its name, get text of sel. item
-                cmd = self.CmdtableWidget.cellWidget(a.row(),0).objectName()            # get the objname of the cmd in the row
-                payload = a.text()
-                self.mqtt_send(cmd, payload)
-            QTableWidget.keyPressEvent(self.CmdtableWidget, event)      # pass on the keyPressEvent to the table
+        QTableWidget.keyPressEvent(self.CmdtableWidget, event)          # pass on the keyPressEvent to the table, to store new value into cell
 
-    #def table_value_changed(self, item):
-        #cmd = self.CmdtableWidget.cellWidget(item.row(), 0).objectName()            # get the objname of the cmd in the row
-        #payload = item.text()
-        #self.mqtt_send(cmd, payload)
+        if event.key() == Qt.Key.Key_Return or event.key() == Qt.Key.Key_Enter:
+            sel_items = self.CmdtableWidget.selectedItems()  # if multiple cells were selected
+            if len(sel_items) >1 :
+                for a in sel_items:
+                    #print(a.row(),a.column(),a.text())             # get row, get col, get text of selected item
+                    #print(self.CmdtableWidget.cellWidget(a.row(),0).objectName(), a.text())     # get cellwidget at row and col, get its name, get text of sel. item
+                    cmd = self.CmdtableWidget.cellWidget(a.row(),0).objectName()            # get the objname of the cmd in the row
+                    payload = a.text()
+                    self.mqtt_send(cmd, payload)
+            elif len(sel_items) == 1 or len(sel_items) == 0:
+                row = self.CmdtableWidget.currentIndex().row()           # get current sel row
+                col = self.CmdtableWidget.currentIndex().column()
+                self.CmdtableWidget.setCurrentItem(None)        # leave cell,otherwise we get no updated value to read
+                cmd = self.CmdtableWidget.cellWidget(row, 0).objectName()  # get the objname of the cmd in the row
+                payload = self.CmdtableWidget.item(row, col).text()
+                self.mqtt_send(cmd, payload)
 
 class scrape_page(QObject):
     finished = pyqtSignal()
