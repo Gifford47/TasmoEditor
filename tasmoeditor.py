@@ -235,19 +235,24 @@ class UI(QtWidgets.QMainWindow, editorUI.Ui_MainWindow):
             pass
 
     def tableOnKeyPressEvent(self, event):
-        if event.key() == Qt.Key.Key_Return or event.key() == Qt.Key.Key_Enter:
-            for a in self.CmdtableWidget.selectedItems():
-                #print(a.row(),a.column(),a.text())             # get row, get col, get text of selected item
-                #print(self.CmdtableWidget.cellWidget(a.row(),0).objectName(), a.text())     # get cellwidget at row and col, get its name, get text of sel. item
-                cmd = self.CmdtableWidget.cellWidget(a.row(),0).objectName()            # get the objname of the cmd in the row
-                payload = a.text()
-                self.mqtt_send(cmd, payload)
-            QTableWidget.keyPressEvent(self.CmdtableWidget, event)      # pass on the keyPressEvent to the table
+        QTableWidget.keyPressEvent(self.CmdtableWidget, event)          # pass on the keyPressEvent to the table, to store new value into cell
 
-    #def table_value_changed(self, item):
-        #cmd = self.CmdtableWidget.cellWidget(item.row(), 0).objectName()            # get the objname of the cmd in the row
-        #payload = item.text()
-        #self.mqtt_send(cmd, payload)
+        if event.key() == Qt.Key.Key_Return or event.key() == Qt.Key.Key_Enter:
+            sel_items = self.CmdtableWidget.selectedItems()  # if multiple cells were selected
+            if len(sel_items) >1 :
+                for a in sel_items:
+                    #print(a.row(),a.column(),a.text())             # get row, get col, get text of selected item
+                    #print(self.CmdtableWidget.cellWidget(a.row(),0).objectName(), a.text())     # get cellwidget at row and col, get its name, get text of sel. item
+                    cmd = self.CmdtableWidget.cellWidget(a.row(),0).objectName()            # get the objname of the cmd in the row
+                    payload = a.text()
+                    self.mqtt_send(cmd, payload)
+            elif len(sel_items) == 1 or len(sel_items) == 0:
+                row = self.CmdtableWidget.currentIndex().row()           # get current sel row
+                col = self.CmdtableWidget.currentIndex().column()
+                self.CmdtableWidget.setCurrentItem(None)        # leave cell,otherwise we get no updated value to read
+                cmd = self.CmdtableWidget.cellWidget(row, 0).objectName()  # get the objname of the cmd in the row
+                payload = self.CmdtableWidget.item(row, col).text()
+                self.mqtt_send(cmd, payload)
 
 class scrape_page(QObject):
     finished = pyqtSignal()
